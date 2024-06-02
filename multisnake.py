@@ -7,6 +7,203 @@ import random
 import time
 
 
+
+class Spielfeld:
+    def __init__(self, breite=400, hoehe=400, objekt=20):
+        self.breite = breite
+        self.hoehe = hoehe
+        self.objekt = objekt
+        self.rand = 20
+        self.min_x = -breite/2
+        self.max_x = breite/2
+        self.min_y = -hoehe/2
+        self.max_y = hoehe/2
+        self.puffer = self.rand/2
+
+    def erstelle_schaltflaechen(self):
+        self.nach_rechts = erstelle_turtle(spielfeld.max_x - spielfeld.rand, spielfeld.min_y + spielfeld.objekt + spielfeld.rand,
+                                 0)
+        self.nach_unten = erstelle_turtle(spielfeld.max_x - spielfeld.rand - spielfeld.objekt, spielfeld.min_y + spielfeld.rand,
+                                90)
+        self.nach_oben = erstelle_turtle(spielfeld.max_x - spielfeld.rand - spielfeld.objekt,
+                               spielfeld.min_y + spielfeld.rand + 2 * spielfeld.objekt, -90)
+        self.nach_links = erstelle_turtle(spielfeld.max_x - spielfeld.rand - 2 * spielfeld.objekt,
+                                spielfeld.min_y + spielfeld.rand + spielfeld.objekt, 180)
+
+    def wurde_geklickt(self, t: turtle.Turtle, x, y):
+        o2 = self.objekt/2
+        return (t.xcor()-o2) <= x <= (t.xcor()+o2) and (t.ycor()-o2) <= y <= (t.ycor()+o2)
+    def wurde_runter_geklickt(self, x, y):
+        return self.wurde_geklickt(self.nach_unten, x, y)
+
+    def wurde_hoch_geklickt(self, x, y):
+        return self.wurde_geklickt(self.nach_oben, x, y)
+
+    def wurde_rechts_geklickt(self, x, y):
+        return self.wurde_geklickt(self.nach_rechts, x, y)
+
+    def wurde_links_geklickt(self, x, y):
+        return self.wurde_geklickt(self.nach_links, x, y)
+
+
+    def random_x_pos(self):
+        pos_idx = self.breite / self.objekt / 2 - 1
+        return random.randint(-pos_idx, pos_idx) * self.objekt
+
+    def random_y_pos(self):
+        pos_idx = self.hoehe / self.objekt / 2 - 1
+        return random.randint(-pos_idx, pos_idx) * self.objekt
+
+
+class Spieler:
+    def __init__(self, name, farbe):
+        self.name = name
+        self.farbe = farbe
+        self.kopf = erstelle_turtle(0, 0, 0, "square", "black")
+        self.segmente = []
+
+    def nach_unten_ausrichten(self):
+        if self.kopf.direction != "up":
+            self.kopf.direction = "down"
+
+    def nach_rechts_ausrichten(self):
+        if self.kopf.direction != "left":
+            self.kopf.direction = "right"
+
+    def nach_links_ausrichten(self):
+        if self.kopf.direction != "right":
+            self.kopf.direction = "left"
+
+    def nach_oben_ausrichten(self):
+        if self.kopf.direction != "down":
+            self.kopf.direction = "up"
+
+    def kopf_bewegen(self):
+        if self.kopf.direction == "down":
+            y = self.kopf.ycor()
+            self.kopf.sety(y - 20)
+
+        elif self.kopf.direction == "right":
+            x = self.kopf.xcor()
+            self.kopf.setx(x + 20)
+
+        elif self.kopf.direction == "left":
+            x = self.kopf.xcor()
+            self.kopf.setx(x - 20)
+
+        elif self.kopf.direction == "up":
+            y = self.kopf.ycor()
+            self.kopf.sety(y + 20)
+
+    def koerper_bewegen(self):
+        for index in range(len(self.segmente) - 1, 0, -1):
+            # Bewege segmente[index] an segmente[index - 1]
+            self.segmente[index].setx(self.segmente[index - 1].xcor())
+            self.segmente[index].sety(self.segmente[index - 1].ycor())
+
+        # Überprüfe, ob Schlange nicht nur aus Kopf besteht
+        if len(self.segmente) > 0:
+            # Wenn, dann bewege erstes Segment zum Kopf
+            self.segmente[0].setx(self.kopf.xcor())
+            self.segmente[0].sety(self.kopf.ycor())
+
+    def segmente_entfernen(self):
+        # Verstecke und entferne Segmente
+        for segment in self.segmente:
+            segment.hideturtle()
+            del segment
+        self.segmente.clear()
+
+    def reset(self):
+        self.kopf.setx(0)
+        self.kopf.sety(0)
+        # Richtung auf "stop" setzen
+        self.kopf.direction = "stop"
+        self.segmente_entfernen()
+
+
+class Spiel:
+    def __init__(self, spielername, spielfeld: Spielfeld):
+        self.feld = spielfeld   # nur Spieler mit der selben Spielfeldgröße können zusammenspielen
+        self.essen = erstelle_turtle(0, 100, 0, "circle", "red")
+        self.lokaler_spieler = Spieler(spielername, "orange")
+        self.netzwerk_spieler = []
+
+    def spiel_neustarten(self, spieler):
+        # Kopf in der Mitte platzieren
+        spieler.reset()
+        # Ausgabe, dass Spielrunde vorbei ist
+        print("Game Over")
+
+    def checke_kollision_mit_segmenten(self, spieler):
+        for segment in spieler.segmente:
+            if segment.distance(spieler.kopf) < spielfeld.objekt:
+                spiel.spiel_neustarten(spieler)
+
+    def checke_kollision_mit_essen(self, spieler):
+        if spieler.kopf.distance(self.essen) < spielfeld.objekt:
+            # Essen an neue Position bewegen
+            steuerfelder_x = spielfeld.max_x - spielfeld.rand - 2 * spielfeld.objekt
+            steuerfelder_y = spielfeld.min_y + spielfeld.rand + 2 * spielfeld.objekt
+            x = steuerfelder_x
+            y = steuerfelder_y
+
+            while x >= steuerfelder_x and y <= steuerfelder_y:
+                x = spielfeld.random_x_pos()
+                y = spielfeld.random_y_pos()
+
+            self.essen.setx(x)
+            self.essen.sety(y)
+
+            # Schlange wachsen lassen
+            neues_segment = turtle.Turtle()
+            neues_segment.shape("square")
+            neues_segment.color(spieler.farbe)
+            neues_segment.speed(0)
+            neues_segment.penup()
+
+            spieler.segmente.append(neues_segment)
+
+    def interpretiere_eingabe(self, x, y):
+        if spielfeld.wurde_runter_geklickt(x, y):
+            self.lokaler_spieler.nach_unten_ausrichten()
+        elif spielfeld.wurde_rechts_geklickt(x, y):
+            self.lokaler_spieler.nach_rechts_ausrichten()
+        elif spielfeld.wurde_hoch_geklickt(x, y):
+            self.lokaler_spieler.nach_oben_ausrichten()
+        elif spielfeld.wurde_links_geklickt(x, y):
+            self.lokaler_spieler.nach_links_ausrichten()
+
+    def wiederhole_spiellogik(self):
+        # Damit das Spiel bis zu einer Niederlage läuft, wird der folgende
+        # Code von wiederhole_spiellogik() in einer Endlosschleife aufgerufen
+        while True:
+            self.checke_kollision_mit_essen(self.lokaler_spieler)
+            self.checke_kollision_mit_fensterrand(self.lokaler_spieler)
+
+            self.lokaler_spieler.koerper_bewegen()
+            self.lokaler_spieler.kopf_bewegen()
+            self.checke_kollision_mit_segmenten(self.lokaler_spieler)
+
+            # schicke den stand des spiels
+            # broadcast game status...
+
+            # Position der verschiedenen Turtle-Elemente aktualisieren
+            turtle.update()
+
+            # time.sleep() unterbricht die Ausführung des weiteren
+            # Codes für die angegebene Anzahl an Sekunden
+            # An dieser Stelle verlangsamt sleep() das Spiel, damit die Schlange
+            # nicht aus dem Bildschirm laufen kann, bevor man sie sehen kann.
+            time.sleep(0.05)
+
+    def checke_kollision_mit_fensterrand(self, spieler: Spieler):
+        if (spieler.kopf.xcor() > spielfeld.max_x-spielfeld.rand/2
+                or spieler.kopf.xcor() < spielfeld.min_x+spielfeld.rand/2
+                or spieler.kopf.ycor() > spielfeld.max_y-spielfeld.rand/2
+                or spieler.kopf.ycor() < spielfeld.min_y+spielfeld.rand/2):
+            spiel.spiel_neustarten(spieler)
+
 # erstelle_turtle() verkürzt die Schreibarbeit für
 # die Erstellung der verschiedenen Turtles im Spiel.
 #
@@ -32,168 +229,27 @@ def erstelle_turtle(x, y, rotationswinkel, shape="triangle", color="green"):
 
     return element
 
-
-def nach_unten_ausrichten():
-    if kopf.direction != "up":
-        kopf.direction = "down"
-
-
-def nach_rechts_ausrichten():
-    if kopf.direction != "left":
-        kopf.direction = "right"
-
-
-def nach_links_ausrichten():
-    if kopf.direction != "right":
-        kopf.direction = "left"
-
-
-def nach_oben_ausrichten():
-    if kopf.direction != "down":
-        kopf.direction = "up"
-
-
-def interpretiere_eingabe(x, y):
-    if 150 <= x <= 170 and -190 <= y <= -170:
-        nach_unten_ausrichten()
-    elif 170 <= x <= 190 and -170 <= y <= -150:
-        nach_rechts_ausrichten()
-    elif 150 <= x <= 170 and -150 <= y <= -130:
-        nach_oben_ausrichten()
-    elif 130 <= x <= 150 and -170 <= y <= -150:
-        nach_links_ausrichten()
-
-
-def kopf_bewegen():
-    if kopf.direction == "down":
-        y = kopf.ycor()
-        kopf.sety(y - 20)
-
-    elif kopf.direction == "right":
-        x = kopf.xcor()
-        kopf.setx(x + 20)
-
-    elif kopf.direction == "left":
-        x = kopf.xcor()
-        kopf.setx(x - 20)
-
-    elif kopf.direction == "up":
-        y = kopf.ycor()
-        kopf.sety(y + 20)
-
-
-def koerper_bewegen():
-    for index in range(len(segmente) - 1, 0, -1):
-        # Bewege segmente[index] an segmente[index - 1]
-        segmente[index].setx(segmente[index - 1].xcor())
-        segmente[index].sety(segmente[index - 1].ycor())
-
-    # Überprüfe, ob Schlange nicht nur aus Kopf besteht
-    if len(segmente) > 0:
-        # Wenn, dann bewege erstes Segment zum Kopf
-        segmente[0].setx(kopf.xcor())
-        segmente[0].sety(kopf.ycor())
-
-
-def segmente_entfernen():
-    # Verstecke und entferne Segmente
-    for segment in segmente:
-        segment.hideturtle()
-        del segment
-    segmente.clear()
-
-
-def spiel_neustarten():
-    # Kopf in der Mitte platzieren
-    kopf.setx(0)
-    kopf.sety(0)
-    # Richtung auf "stop" setzen
-    kopf.direction = "stop"
-    segmente_entfernen()
-    # Ausgabe, dass Spielrunde vorbei ist
-    print("Game Over")
-
-
-def checke_kollision_mit_fensterrand():
-    if kopf.xcor() > 190 or kopf.xcor() < -190 or kopf.ycor() > 190 or kopf.ycor() < -190:
-        spiel_neustarten()
-
-
-def checke_kollision_mit_segmenten():
-    for segment in segmente:
-        if segment.distance(kopf) < 20:
-            spiel_neustarten()
-
-
-def checke_kollision_mit_essen():
-    if kopf.distance(essen) < 20:
-        # Essen an neue Position bewegen
-        x = 140
-        y = -140
-
-        while x >= 140 and y <= -140:
-            x = random.randint(-9, 9) * 20
-            y = random.randint(-9, 9) * 20
-
-        essen.setx(x)
-        essen.sety(y)
-
-        # Schlange wachsen lassen
-        neues_segment = turtle.Turtle()
-        neues_segment.shape("square")
-        neues_segment.color("yellow")
-        neues_segment.speed(0)
-        neues_segment.penup()
-
-        segmente.append(neues_segment)
-
-def wiederhole_spiellogik():
-    # Damit das Spiel bis zu einer Niederlage läuft, wird der folgende
-    # Code von wiederhole_spiellogik() in einer Endlosschleife aufgerufen
-    while True:
-        checke_kollision_mit_essen()
-        checke_kollision_mit_fensterrand()
-
-        koerper_bewegen()
-        kopf_bewegen()
-        checke_kollision_mit_segmenten()
-
-        # Position der verschiedenen Turtle-Elemente aktualisieren
-        turtle.update()
-
-        # time.sleep() unterbricht die Ausführung des weiteren
-        # Codes für die angegebene Anzahl an Sekunden
-        # An dieser Stelle verlangsamt sleep() das Spiel, damit die Schlange
-        # nicht aus dem Bildschirm laufen kann, bevor man sie sehen kann.
-        time.sleep(0.15)
-
-
-spielername = input('Name eingeben:')
+spielername = 'Daniel' # input('Name eingeben:')
+spielfeld = Spielfeld(920, 920)
+spiel = Spiel(spielername, spielfeld)
 
 # Auf dem Spielfeld sichtbare Elemente definieren
-rechts = erstelle_turtle(180, -160, 0)
-unten = erstelle_turtle(160, -180, 90)
-oben = erstelle_turtle(160, -140, -90)
-links = erstelle_turtle(140, -160, 180)
-
-essen = erstelle_turtle(0, 100, 0, "circle", "red")
-kopf = erstelle_turtle(0, 0, 0, "square", "black")
-segmente = []
+spielfeld.erstelle_schaltflaechen()
 
 # Spielbereich (das sich öffnende Fenster beim Ausführen dieser Datei) definieren
 spielbereich = turtle.Screen()
 spielbereich.title(f'Mein Snake-Spiel ({spielername})')
-spielbereich.setup(width=1024, height=1024)
+spielbereich.setup(width=spielfeld.breite+spielfeld.rand, height=spielfeld.hoehe+spielfeld.rand)
 
 # Drücken der Pfeiltasten zur Richtungssteuerung registrieren
-spielbereich.onkeypress(nach_oben_ausrichten, "Up")
-spielbereich.onkeypress(nach_links_ausrichten, "Left")
-spielbereich.onkeypress(nach_unten_ausrichten, "Down")
-spielbereich.onkeypress(nach_rechts_ausrichten, "Right")
+spielbereich.onkeypress(spiel.lokaler_spieler.nach_oben_ausrichten, "Up")
+spielbereich.onkeypress(spiel.lokaler_spieler.nach_links_ausrichten, "Left")
+spielbereich.onkeypress(spiel.lokaler_spieler.nach_unten_ausrichten, "Down")
+spielbereich.onkeypress(spiel.lokaler_spieler.nach_rechts_ausrichten, "Right")
 spielbereich.listen(0)
 
 # Registrierung der Richtungssteuerung über das Anklicken der grünen Dreiecke
-turtle.onscreenclick(interpretiere_eingabe)
+turtle.onscreenclick(spiel.interpretiere_eingabe)
 
 # Turtle in der Mitte verbergen
 turtle.hideturtle()
@@ -203,7 +259,7 @@ turtle.tracer(False)
 
 # Try-Except-Block fängt Beenden des Spiels ab
 try:
-    wiederhole_spiellogik()
+    spiel.wiederhole_spiellogik()
 except turtle.Terminator:
     print("Das Spiel wurde beendet.")
     # exit(0) beendet das Program sauber
