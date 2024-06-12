@@ -5,7 +5,8 @@
 import turtle
 import random
 import time
-
+import json
+from game_broadcaster import GameBroadcaster
 
 
 class Spielfeld:
@@ -19,6 +20,11 @@ class Spielfeld:
         self.min_y = -hoehe/2
         self.max_y = hoehe/2
         self.puffer = self.rand/2
+
+    def serialize(self) -> str:
+        return json.dumps({'breite': self.breite,
+                           'hoehe': self.hoehe,
+                           'objekt': self.objekt})
 
     def erstelle_schaltflaechen(self):
         self.nach_rechts = erstelle_turtle(spielfeld.max_x - spielfeld.rand, spielfeld.min_y + spielfeld.objekt + spielfeld.rand,
@@ -61,6 +67,21 @@ class Spieler:
         self.farbe = farbe
         self.kopf = erstelle_turtle(0, 0, 0, "square", "black")
         self.segmente = []
+
+    def wachsen(self):
+        neues_segment = turtle.Turtle()
+        neues_segment.shape("square")
+        neues_segment.color(self.farbe)
+        neues_segment.speed(0)
+        neues_segment.penup()
+
+        self.segmente.append(neues_segment)
+
+    def serialize(self) -> str:
+        return json.dumps({'name': self.name,
+                           'farbe': self.farbe,
+                           'kopf': serialize_turtle(self.kopf),
+                           'segmente': [serialize_turtle(t) for t in self.segmente]})
 
     def nach_unten_ausrichten(self):
         if self.kopf.direction != "up":
@@ -123,11 +144,72 @@ class Spieler:
 
 
 class Spiel:
-    def __init__(self, spielername, spielfeld: Spielfeld):
+    def __init__(self, spielername, spielfeld: Spielfeld, fps=20):
         self.feld = spielfeld   # nur Spieler mit der selben Spielfeldgröße können zusammenspielen
+        self.fps = fps
         self.essen = erstelle_turtle(0, 100, 0, "circle", "red")
+        self.netzwerk_essen = {}
         self.lokaler_spieler = Spieler(spielername, "orange")
-        self.netzwerk_spieler = []
+        self.netzwerk_spieler = {}
+        self.netzwerk_spieler_letzter_kontakt = {}
+        self.netzwerk_spieler_timeout = 1 # 1 sekunde
+
+    def verschiebe_essen(self):
+        # Essen an neue Position bewegen
+        steuerfelder_x = spielfeld.max_x - spielfeld.rand - 2 * spielfeld.objekt
+        steuerfelder_y = spielfeld.min_y + spielfeld.rand + 2 * spielfeld.objekt
+        x = steuerfelder_x
+        y = steuerfelder_y
+
+        while x >= steuerfelder_x and y <= steuerfelder_y:
+            x = spielfeld.random_x_pos()
+            y = spielfeld.random_y_pos()
+
+        self.essen.setx(x)
+        self.essen.sety(y)
+
+    def serialize(self) -> str:
+        return json.dumps({
+            "feld": self.feld.serialize(),
+            "fps": self.fps,
+            "essen": serialize_turtle(self.essen),
+            "spieler": self.lokaler_spieler.serialize()
+        })
+
+    def deserialize(self, data, sender):
+        # print(f'received game data from {sender}: {data}')
+        print(len(data))
+        # speichere letzten kontakt zu netzwerk spieler
+        self.netzwerk_spieler_letzter_kontakt[sender] = time.time()
+
+        # deserialisiere daten
+        data = json.loads(data)
+        # checke kompatibilität
+        if self.ist_kompatibel(data):
+            # spiel daten sind kompatibel - deserialisiere
+            # essen
+            ed = json.loads(data['essen'])
+            if sender in self.netzwerk_essen:
+                # aktualisiere
+                essen: turtle.Turtle = self.netzwerk_essen[sender]
+                essen.setx(ed['x'])
+                essen.sety(ed['y'])
+            else:
+                # erstelle neues essens turtle - immer grün
+                self.netzwerk_essen[sender] = erstelle_turtle(ed['x'], ed['y'], 0, ed['shape'], 'green')
+
+            # spieler
+            sd = json.loads(data['spieler'])
+            if sender in self.netzwerk_spieler:
+                # aktualisiere
+                spieler = self.netzwerk_spieler[sender]
+
+    def ist_kompatibel(self, spieldaten) -> bool:
+        # deserialisiere spielfeld daten
+        feld_daten = json.loads(spieldaten['feld'])
+
+        return (spieldaten['fps'] == self.fps and feld_daten['breite'] == self.feld.breite and
+                feld_daten['hoehe'] == self.feld.hoehe and feld_daten['objekt'] == self.feld.objekt)
 
     def spiel_neustarten(self, spieler):
         # Kopf in der Mitte platzieren
@@ -135,34 +217,33 @@ class Spiel:
         # Ausgabe, dass Spielrunde vorbei ist
         print("Game Over")
 
-    def checke_kollision_mit_segmenten(self, spieler):
-        for segment in spieler.segmente:
-            if segment.distance(spieler.kopf) < spielfeld.objekt:
-                spiel.spiel_neustarten(spieler)
+    def checke_kollision_mit_segmenten(self):
+        # checke kollision mit eigenen segmenten
+        for segment in self.lokaler_spieler.segmente:
+            if segment.distance(self.lokaler_spieler.kopf) < self.feld.objekt:
+                self.spiel_neustarten(self.lokaler_spieler)
 
-    def checke_kollision_mit_essen(self, spieler):
-        if spieler.kopf.distance(self.essen) < spielfeld.objekt:
-            # Essen an neue Position bewegen
-            steuerfelder_x = spielfeld.max_x - spielfeld.rand - 2 * spielfeld.objekt
-            steuerfelder_y = spielfeld.min_y + spielfeld.rand + 2 * spielfeld.objekt
-            x = steuerfelder_x
-            y = steuerfelder_y
+        # checke kollision mit anderen spielern
+        for spieler in self.netzwerk_spieler:
+            for segment in spieler.segmente:
+                if segment.distance(self.lokaler_spieler.kopf) < self.feld.objekt:
+                    self.spiel_neustarten(self.lokaler_spieler)
 
-            while x >= steuerfelder_x and y <= steuerfelder_y:
-                x = spielfeld.random_x_pos()
-                y = spielfeld.random_y_pos()
+    def checke_kollision_mit_essen(self):
+        # checke lokaler spieler und netzwerk essen
+        for essen in self.netzwerk_essen:
+            if self.lokaler_spieler.kopf.distance(self.essen) < self.feld.objekt:
+                self.lokaler_spieler.wachsen()
 
-            self.essen.setx(x)
-            self.essen.sety(y)
+        # checke lokaler spieler und lokales essen
+        if self.lokaler_spieler.kopf.distance(self.essen) < self.feld.objekt:
+            self.verschiebe_essen()
+            self.lokaler_spieler.wachsen()
 
-            # Schlange wachsen lassen
-            neues_segment = turtle.Turtle()
-            neues_segment.shape("square")
-            neues_segment.color(spieler.farbe)
-            neues_segment.speed(0)
-            neues_segment.penup()
-
-            spieler.segmente.append(neues_segment)
+        # checke netzwerk spieler und lokales essen
+        for spieler in self.netzwerk_spieler:
+            if spieler.kopf.distance(self.essen) < self.feld.objekt:
+                self.verschiebe_essen()
 
     def interpretiere_eingabe(self, x, y):
         if spielfeld.wurde_runter_geklickt(x, y):
@@ -174,28 +255,47 @@ class Spiel:
         elif spielfeld.wurde_links_geklickt(x, y):
             self.lokaler_spieler.nach_links_ausrichten()
 
+    def entferne_inaktive_netzwerkspieler(self):
+        now = time.time()
+        for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
+            if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
+                del self.netzwerk_essen[sender]
+                del self.netzwerk_spieler[sender]
+
+
     def wiederhole_spiellogik(self):
         # Damit das Spiel bis zu einer Niederlage läuft, wird der folgende
         # Code von wiederhole_spiellogik() in einer Endlosschleife aufgerufen
+        single_loop_time = 1/self.fps
+        update_time = 0.05  # time reserved to update the turtle objects at the end
+
         while True:
-            self.checke_kollision_mit_essen(self.lokaler_spieler)
+            loop_finish_time = time.time() + single_loop_time
+
+            self.checke_kollision_mit_essen()
             self.checke_kollision_mit_fensterrand(self.lokaler_spieler)
 
             self.lokaler_spieler.koerper_bewegen()
             self.lokaler_spieler.kopf_bewegen()
-            self.checke_kollision_mit_segmenten(self.lokaler_spieler)
+            self.checke_kollision_mit_segmenten()
 
-            # schicke den stand des spiels
-            # broadcast game status...
+            # broadcast serialized game status
+            gb.broadcast_game(self.serialize())
+
+            # receive game status broadcasted by other players
+            while time.time() < loop_finish_time - update_time:
+                data, sender = gb.receive_game_broadcasts()
+                if data is None:
+                    time.sleep(0.01)
+                else:
+                    # deserialize data
+                    self.deserialize(data, sender)
+
+            self.entferne_inaktive_netzwerkspieler()
 
             # Position der verschiedenen Turtle-Elemente aktualisieren
             turtle.update()
 
-            # time.sleep() unterbricht die Ausführung des weiteren
-            # Codes für die angegebene Anzahl an Sekunden
-            # An dieser Stelle verlangsamt sleep() das Spiel, damit die Schlange
-            # nicht aus dem Bildschirm laufen kann, bevor man sie sehen kann.
-            time.sleep(0.05)
 
     def checke_kollision_mit_fensterrand(self, spieler: Spieler):
         if (spieler.kopf.xcor() > spielfeld.max_x-spielfeld.rand/2
@@ -229,9 +329,19 @@ def erstelle_turtle(x, y, rotationswinkel, shape="triangle", color="green"):
 
     return element
 
+def serialize_turtle(t: turtle.Turtle) -> str:
+    return json.dumps({'x': t.xcor(),
+                       'y': t.ycor(),
+                       'color': t.color(),
+                       'shape': t.shape()})
+
+def deserialize_turtle():
+    pass
+
 spielername = 'Daniel' # input('Name eingeben:')
 spielfeld = Spielfeld(920, 920)
-spiel = Spiel(spielername, spielfeld)
+spiel = Spiel(spielername, spielfeld, 8)
+gb = GameBroadcaster()
 
 # Auf dem Spielfeld sichtbare Elemente definieren
 spielfeld.erstelle_schaltflaechen()

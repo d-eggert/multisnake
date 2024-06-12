@@ -1,44 +1,25 @@
 import socket
-import asyncio
-
-async def handle_client(reader, writer):
-    request = None
-    while request != 'quit':
-        request = (await reader.read(255)).decode('utf8')
-        response = str(eval(request)) + '\n'
-        writer.write(response.encode('utf8'))
-        await writer.drain()
-    writer.close()
-
-async def run_server():
-    server = await asyncio.start_server(handle_client, 'localhost', 15555)
-    async with server:
-        await server.serve_forever()
-
-asyncio.run(run_server())
 
 class GameBroadcaster:
-    def __init__(self):
+    def __init__(self, port=5000):
         self.sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sender.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)  # aktiviere broadcast funktion
+        self.lokal_ip = socket.gethostbyname(socket.gethostname())
 
         self.receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.receiver.bind(("0.0.0.0", 5000))
-        asyncio.run(self.receive())
+        self.receiver.bind(("0.0.0.0", port))
+        self.receiver.setblocking(False)
+        self.broadcast_address = ("255.255.255.255", port)
 
-    async def handle_client(client):
-        loop = asyncio.get_event_loop()
-        request = None
-        while request != 'quit':
-            request = (await loop.sock_recv(client, 255)).decode('utf8')
-            response = str(eval(request)) + '\n'
-            await loop.sock_sendall(client, response.encode('utf8'))
-        client.close()
+    def broadcast_game(self, serialized_game: str):
+        self.sender.sendto(serialized_game.encode(), self.broadcast_address)
 
-    async def receive(self):
-        while True:
-            data, addr = self.receiver.recvfrom(100)
-            print(f"empfange Daten: {data.decode()}")
-
-
-
+    def receive_game_broadcasts(self) -> (str, str):
+        try:
+            data, addr = self.receiver.recvfrom(1500000)
+            if addr[0] == self.lokal_ip:
+                # this is our own broadcast - irgnore
+                data, addr = self.receiver.recvfrom(1500000)
+            return data.decode(), str(addr)
+        except BlockingIOError:
+            return None, None
