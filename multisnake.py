@@ -204,6 +204,7 @@ class Spiel:
                 # aktualisiere
                 spieler = self.netzwerk_spieler[sender]
 
+
     def ist_kompatibel(self, spieldaten) -> bool:
         # deserialisiere spielfeld daten
         feld_daten = json.loads(spieldaten['feld'])
@@ -231,8 +232,8 @@ class Spiel:
 
     def checke_kollision_mit_essen(self):
         # checke lokaler spieler und netzwerk essen
-        for essen in self.netzwerk_essen:
-            if self.lokaler_spieler.kopf.distance(self.essen) < self.feld.objekt:
+        for essen in self.netzwerk_essen.items():
+            if self.lokaler_spieler.kopf.distance(essen[1]) < self.feld.objekt:
                 self.lokaler_spieler.wachsen()
 
         # checke lokaler spieler und lokales essen
@@ -260,7 +261,7 @@ class Spiel:
         for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
             if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
                 del self.netzwerk_essen[sender]
-                del self.netzwerk_spieler[sender]
+                # del self.netzwerk_spieler[sender]
 
 
     def wiederhole_spiellogik(self):
