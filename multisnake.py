@@ -177,8 +177,7 @@ class Spiel:
         })
 
     def deserialize(self, data, sender):
-        # print(f'received game data from {sender}: {data}')
-        print(len(data))
+        print(f'received game data from {sender}: {data}')
         # speichere letzten kontakt zu netzwerk spieler
         self.netzwerk_spieler_letzter_kontakt[sender] = time.time()
 
@@ -200,9 +199,31 @@ class Spiel:
 
             # spieler
             sd = json.loads(data['spieler'])
-            if sender in self.netzwerk_spieler:
-                # aktualisiere
-                spieler = self.netzwerk_spieler[sender]
+            if sender not in self.netzwerk_spieler:
+                self.netzwerk_spieler[sender] = Spieler(sd['name'], sd['farbe'])
+
+            spieler = self.netzwerk_spieler[sender]
+            # aktualisiere
+            kopf = json.loads(sd['kopf'])
+            spieler.kopf.setx(kopf['x'])
+            spieler.kopf.sety(kopf['y'])
+            seg = sd['segmente']
+            while len(seg) < len(spieler.segmente):
+                # zu viele segmente - entferne
+                s: turtle.Turtle = spieler.segmente.pop()
+                s.hideturtle()
+                del s
+
+            while len(seg) > len(spieler.segmente):
+                # zu wenige segmente - hinzufuegen
+                spieler.segmente.append(erstelle_turtle(0, 0, 0, 'square', 'cyan'))#sd['farbe']))
+
+            # aktualisiere segment positionen
+            for i in range(len(spieler.segmente)):
+                seg_i = json.loads(seg[i])
+                s: turtle.Turtle = spieler.segmente[i]
+                s.setx(seg_i['x'])
+                s.sety(seg_i['y'])
 
 
     def ist_kompatibel(self, spieldaten) -> bool:
@@ -225,15 +246,15 @@ class Spiel:
                 self.spiel_neustarten(self.lokaler_spieler)
 
         # checke kollision mit anderen spielern
-        for spieler in self.netzwerk_spieler:
+        for spieler in self.netzwerk_spieler.values():
             for segment in spieler.segmente:
                 if segment.distance(self.lokaler_spieler.kopf) < self.feld.objekt:
                     self.spiel_neustarten(self.lokaler_spieler)
 
     def checke_kollision_mit_essen(self):
         # checke lokaler spieler und netzwerk essen
-        for essen in self.netzwerk_essen.items():
-            if self.lokaler_spieler.kopf.distance(essen[1]) < self.feld.objekt:
+        for essen in self.netzwerk_essen.values():
+            if self.lokaler_spieler.kopf.distance(essen) < self.feld.objekt:
                 self.lokaler_spieler.wachsen()
 
         # checke lokaler spieler und lokales essen
@@ -242,7 +263,7 @@ class Spiel:
             self.lokaler_spieler.wachsen()
 
         # checke netzwerk spieler und lokales essen
-        for spieler in self.netzwerk_spieler:
+        for spieler in self.netzwerk_spieler.values():
             if spieler.kopf.distance(self.essen) < self.feld.objekt:
                 self.verschiebe_essen()
 
@@ -260,8 +281,10 @@ class Spiel:
         now = time.time()
         for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
             if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
-                del self.netzwerk_essen[sender]
-                # del self.netzwerk_spieler[sender]
+                if sender in self.netzwerk_essen:
+                    del self.netzwerk_essen[sender]
+                if sender in self.netzwerk_spieler:
+                    del self.netzwerk_spieler[sender]
 
 
     def wiederhole_spiellogik(self):
@@ -336,8 +359,24 @@ def serialize_turtle(t: turtle.Turtle) -> str:
                        'color': t.color(),
                        'shape': t.shape()})
 
-def deserialize_turtle():
-    pass
+def zeichne_rand():
+    # gehe in linke untere ecke
+    turtle.penup()
+    turtle.setx(spielfeld.min_x + spielfeld.rand / 2)
+    turtle.sety(spielfeld.min_y + spielfeld.rand / 2)
+    # zeichne rand
+    turtle.pendown()
+    turtle.forward(spielfeld.breite - spielfeld.rand)
+    turtle.left(90)
+    turtle.forward(spielfeld.hoehe - spielfeld.rand)
+    turtle.left(90)
+    turtle.forward(spielfeld.breite - spielfeld.rand)
+    turtle.left(90)
+    turtle.forward(spielfeld.hoehe - spielfeld.rand)
+
+
+# Automatisches Aktualisieren der Turtle-Elemente ausschalten
+turtle.tracer(False)
 
 spielername = 'Daniel' # input('Name eingeben:')
 spielfeld = Spielfeld(920, 920)
@@ -362,11 +401,12 @@ spielbereich.listen(0)
 # Registrierung der Richtungssteuerung über das Anklicken der grünen Dreiecke
 turtle.onscreenclick(spiel.interpretiere_eingabe)
 
+zeichne_rand()
+
 # Turtle in der Mitte verbergen
 turtle.hideturtle()
 
-# Automatisches Aktualisieren der Turtle-Elemente ausschalten
-turtle.tracer(False)
+
 
 # Try-Except-Block fängt Beenden des Spiels ab
 try:
