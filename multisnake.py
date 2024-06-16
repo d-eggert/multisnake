@@ -145,12 +145,12 @@ class Spieler:
 
 
 class Spiel:
-    def __init__(self, spielername, spielfeld: Spielfeld, fps=20):
+    def __init__(self, spielername, spielerfarbe, spielfeld: Spielfeld, fps=20):
         self.feld = spielfeld   # nur Spieler mit der selben Spielfeldgröße können zusammenspielen
         self.fps = fps
         self.essen = erstelle_turtle(0, 100, 0, "circle", "red")
         self.netzwerk_essen = {}
-        self.lokaler_spieler = Spieler(spielername, "cyan")
+        self.lokaler_spieler = Spieler(spielername, spielerfarbe)
         self.netzwerk_spieler = {}
         self.netzwerk_spieler_letzter_kontakt = {}
         self.netzwerk_spieler_timeout = 5 # 5 sekunden
@@ -398,9 +398,10 @@ def zeichne_rand():
 # Automatisches Aktualisieren der Turtle-Elemente ausschalten
 turtle.tracer(False)
 
-spielername = 'Daniel (Jupiter)' # input('Name eingeben:')
+spielername = 'Nobody' # input('Name eingeben:')
+spielerfarbe = 'orange'
 spielfeld = Spielfeld(920, 920)
-spiel = Spiel(spielername, spielfeld, 3)
+spiel = Spiel(spielername, spielerfarbe, spielfeld, 12)
 gb = GameBroadcaster()
 
 # Auf dem Spielfeld sichtbare Elemente definieren
