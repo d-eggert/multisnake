@@ -239,21 +239,19 @@ class Spiel:
         print(f'Game Over, Punkte: {len(spieler.segmente)}')
         if len(self.netzwerk_spieler) > 0:
             print('Punkte der anderen Spieler:')
-            for spieler in self.netzwerk_spieler.values():
-                print(f'{spieler[1].name} ({spieler[0]}): {len(spieler[1].segmente)}')
-
+            for s in self.netzwerk_spieler.items():
+                print(f'{s[1].name} ({s[0][0]}): {len(s[1].segmente)}')
 
         # lokalen spieler zurücksetzen
         spieler.reset()
 
         while len(self.netzwerk_essen) > 0:
-            essen = self.netzwerk_essen.pop()
+            essen = self.netzwerk_essen.popitem()
             essen[1].hideturtle()
             del essen
         self.netzwerk_essen.clear()
 
         self.verschiebe_essen()
-
 
     def checke_kollision_mit_segmenten(self):
         # checke kollision mit eigenen segmenten
@@ -298,12 +296,13 @@ class Spiel:
         for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
             if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
                 while len(self.netzwerk_essen) > 0:
-                    essen = self.netzwerk_essen.pop()
-                    essen.hideturtule()
+                    essen = self.netzwerk_essen.popitem()
+                    essen[1].hideturtle()
                     del essen
                 while len(self.netzwerk_spieler) > 0:
-                    spieler = self.netzwerk_spieler.pop()
-                    spieler.reset()
+                    spieler = self.netzwerk_spieler.popitem()
+                    spieler[1].reset()
+                    spieler[1].kopf.hideturtle()
                     del spieler
 
 
@@ -321,7 +320,8 @@ class Spiel:
 
             self.lokaler_spieler.koerper_bewegen()
             self.lokaler_spieler.kopf_bewegen()
-            self.checke_kollision_mit_segmenten()
+            if self.lokaler_spieler.kopf.direction != 'stop':
+                self.checke_kollision_mit_segmenten()
 
             # broadcast serialized game status
             gb.broadcast_game(self.serialize())
