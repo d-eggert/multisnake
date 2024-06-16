@@ -130,7 +130,8 @@ class Spieler:
 
     def segmente_entfernen(self):
         # Verstecke und entferne Segmente
-        for segment in self.segmente:
+        while len(self.segmente) > 0:
+            segment = self.segmente.pop()
             segment.hideturtle()
             del segment
         self.segmente.clear()
@@ -152,7 +153,7 @@ class Spiel:
         self.lokaler_spieler = Spieler(spielername, "orange")
         self.netzwerk_spieler = {}
         self.netzwerk_spieler_letzter_kontakt = {}
-        self.netzwerk_spieler_timeout = 1 # 1 sekunde
+        self.netzwerk_spieler_timeout = 5 # 5 sekunden
 
     def verschiebe_essen(self):
         # Essen an neue Position bewegen
@@ -177,7 +178,7 @@ class Spiel:
         })
 
     def deserialize(self, data, sender):
-        print(f'received game data from {sender}: {data}')
+        # print(f'received game data from {sender}: {data}')
         # speichere letzten kontakt zu netzwerk spieler
         self.netzwerk_spieler_letzter_kontakt[sender] = time.time()
 
@@ -234,10 +235,25 @@ class Spiel:
                 feld_daten['hoehe'] == self.feld.hoehe and feld_daten['objekt'] == self.feld.objekt)
 
     def spiel_neustarten(self, spieler):
-        # Kopf in der Mitte platzieren
-        spieler.reset()
         # Ausgabe, dass Spielrunde vorbei ist
-        print("Game Over")
+        print(f'Game Over, Punkte: {len(spieler.segmente)}')
+        if len(self.netzwerk_spieler) > 0:
+            print('Punkte der anderen Spieler:')
+            for spieler in self.netzwerk_spieler.values():
+                print(f'{spieler[1].name} ({spieler[0]}): {len(spieler[1].segmente)}')
+
+
+        # lokalen spieler zurücksetzen
+        spieler.reset()
+
+        while len(self.netzwerk_essen) > 0:
+            essen = self.netzwerk_essen.pop()
+            essen[1].hideturtle()
+            del essen
+        self.netzwerk_essen.clear()
+
+        self.verschiebe_essen()
+
 
     def checke_kollision_mit_segmenten(self):
         # checke kollision mit eigenen segmenten
@@ -282,8 +298,10 @@ class Spiel:
         for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
             if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
                 if sender in self.netzwerk_essen:
+                    sender[1].hideturtule()
                     del self.netzwerk_essen[sender]
                 if sender in self.netzwerk_spieler:
+                    sender[1].reset()
                     del self.netzwerk_spieler[sender]
 
 
