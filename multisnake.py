@@ -150,7 +150,7 @@ class Spiel:
         self.fps = fps
         self.essen = erstelle_turtle(0, 100, 0, "circle", "red")
         self.netzwerk_essen = {}
-        self.lokaler_spieler = Spieler(spielername, "orange")
+        self.lokaler_spieler = Spieler(spielername, "cyan")
         self.netzwerk_spieler = {}
         self.netzwerk_spieler_letzter_kontakt = {}
         self.netzwerk_spieler_timeout = 5 # 5 sekunden
@@ -297,12 +297,14 @@ class Spiel:
         now = time.time()
         for (sender, letzter_kontakt) in self.netzwerk_spieler_letzter_kontakt.items():
             if now - letzter_kontakt > self.netzwerk_spieler_timeout and sender in self.netzwerk_essen:
-                if sender in self.netzwerk_essen:
-                    sender[1].hideturtule()
-                    del self.netzwerk_essen[sender]
-                if sender in self.netzwerk_spieler:
-                    sender[1].reset()
-                    del self.netzwerk_spieler[sender]
+                while len(self.netzwerk_essen) > 0:
+                    essen = self.netzwerk_essen.pop()
+                    essen.hideturtule()
+                    del essen
+                while len(self.netzwerk_spieler) > 0:
+                    spieler = self.netzwerk_spieler.pop()
+                    spieler.reset()
+                    del spieler
 
 
     def wiederhole_spiellogik(self):
@@ -396,9 +398,9 @@ def zeichne_rand():
 # Automatisches Aktualisieren der Turtle-Elemente ausschalten
 turtle.tracer(False)
 
-spielername = 'Daniel' # input('Name eingeben:')
+spielername = 'Daniel (Jupiter)' # input('Name eingeben:')
 spielfeld = Spielfeld(920, 920)
-spiel = Spiel(spielername, spielfeld, 8)
+spiel = Spiel(spielername, spielfeld, 3)
 gb = GameBroadcaster()
 
 # Auf dem Spielfeld sichtbare Elemente definieren

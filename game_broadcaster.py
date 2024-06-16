@@ -1,10 +1,11 @@
 import socket
 
+
 class GameBroadcaster:
     def __init__(self, port=5000):
         self.sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sender.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)  # aktiviere broadcast funktion
-        self.lokal_ip = socket.gethostbyname(socket.gethostname())
+        self.lokal_ip = get_ip()
 
         self.receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.receiver.bind(("0.0.0.0", port))
@@ -23,3 +24,18 @@ class GameBroadcaster:
             return data.decode(), str(addr)
         except BlockingIOError:
             return None, None
+
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.254.254.254', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
