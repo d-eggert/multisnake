@@ -22,9 +22,9 @@ class Spielfeld:
         self.puffer = self.rand/2
 
     def serialize(self) -> str:
-        return json.dumps({'breite': self.breite,
-                           'hoehe': self.hoehe,
-                           'objekt': self.objekt})
+        obj = {}
+        # Aufgabe
+        return json.dumps(obj)
 
     def erstelle_schaltflaechen(self):
         self.nach_rechts = erstelle_turtle(spielfeld.max_x - spielfeld.rand, spielfeld.min_y + spielfeld.objekt + spielfeld.rand,
@@ -78,10 +78,11 @@ class Spieler:
         self.segmente.append(neues_segment)
 
     def serialize(self) -> str:
-        return json.dumps({'name': self.name,
-                           'farbe': self.farbe,
-                           'kopf': serialize_turtle(self.kopf),
-                           'segmente': [serialize_turtle(t) for t in self.segmente]})
+        obj = {'name': self.name,
+               'farbe': self.farbe,
+               'kopf': serialize_turtle(self.kopf),
+               'segmente': [serialize_turtle(t) for t in self.segmente]}
+        return json.dumps(obj)
 
     def nach_unten_ausrichten(self):
         if self.kopf.direction != "up":
@@ -145,7 +146,7 @@ class Spieler:
 
 
 class Spiel:
-    def __init__(self, spielername, spielerfarbe, spielfeld: Spielfeld, fps=20):
+    def __init__(self, spielername, spielerfarbe, spielfeld: Spielfeld, fps):
         self.feld = spielfeld   # nur Spieler mit der selben Spielfeldgröße können zusammenspielen
         self.fps = fps
         self.essen = erstelle_turtle(0, 100, 0, "circle", "red")
@@ -170,12 +171,9 @@ class Spiel:
         self.essen.sety(y)
 
     def serialize(self) -> str:
-        return json.dumps({
-            "feld": self.feld.serialize(),
-            "fps": self.fps,
-            "essen": serialize_turtle(self.essen),
-            "spieler": self.lokaler_spieler.serialize()
-        })
+        obj = {}
+        # Aufgabe
+        return json.dumps(obj)
 
     def deserialize(self, data, sender):
         # print(f'received game data from {sender}: {data}')
@@ -199,9 +197,8 @@ class Spiel:
                 self.netzwerk_essen[sender] = erstelle_turtle(ed['x'], ed['y'], 0, ed['shape'], 'green')
 
             # spieler
-            sd = json.loads(data['spieler'])
-            if sender not in self.netzwerk_spieler:
-                self.netzwerk_spieler[sender] = Spieler(sd['name'], sd['farbe'])
+            # Aufgabe - Deserialisierung
+            sd = {}
 
             spieler = self.netzwerk_spieler[sender]
             # aktualisiere
@@ -306,39 +303,39 @@ class Spiel:
                     del spieler
 
 
-    def wiederhole_spiellogik(self):
+    def spiellogik(self):
         # Damit das Spiel bis zu einer Niederlage läuft, wird der folgende
         # Code von wiederhole_spiellogik() in einer Endlosschleife aufgerufen
         single_loop_time = 1/self.fps
         update_time = 0.05  # time reserved to update the turtle objects at the end
 
-        while True:
-            loop_finish_time = time.time() + single_loop_time
 
-            self.checke_kollision_mit_essen()
-            self.checke_kollision_mit_fensterrand(self.lokaler_spieler)
+        loop_finish_time = time.time() + single_loop_time
 
-            self.lokaler_spieler.koerper_bewegen()
-            self.lokaler_spieler.kopf_bewegen()
-            if self.lokaler_spieler.kopf.direction != 'stop':
-                self.checke_kollision_mit_segmenten()
+        self.checke_kollision_mit_essen()
+        self.checke_kollision_mit_fensterrand(self.lokaler_spieler)
 
-            # broadcast serialized game status
-            gb.broadcast_game(self.serialize())
+        self.lokaler_spieler.koerper_bewegen()
+        self.lokaler_spieler.kopf_bewegen()
+        if self.lokaler_spieler.kopf.direction != 'stop':
+            self.checke_kollision_mit_segmenten()
 
-            # receive game status broadcasted by other players
-            while time.time() < loop_finish_time - update_time:
-                data, sender = gb.receive_game_broadcasts()
-                if data is None:
-                    time.sleep(0.01)
-                else:
-                    # deserialize data
-                    self.deserialize(data, sender)
+        # broadcast serialized game status
+        gb.broadcast_game(self.serialize())
 
-            self.entferne_inaktive_netzwerkspieler()
+        # receive game status broadcasted by other players
+        while time.time() < loop_finish_time - update_time:
+            data, sender = gb.receive_game_broadcasts()
+            if data is None:
+                time.sleep(0.01)
+            else:
+                # deserialize data
+                self.deserialize(data, sender)
 
-            # Position der verschiedenen Turtle-Elemente aktualisieren
-            turtle.update()
+        self.entferne_inaktive_netzwerkspieler()
+
+        # Position der verschiedenen Turtle-Elemente aktualisieren
+        turtle.update()
 
 
     def checke_kollision_mit_fensterrand(self, spieler: Spieler):
@@ -374,10 +371,9 @@ def erstelle_turtle(x, y, rotationswinkel, shape="triangle", color="green"):
     return element
 
 def serialize_turtle(t: turtle.Turtle) -> str:
-    return json.dumps({'x': t.xcor(),
-                       'y': t.ycor(),
-                       'color': t.color(),
-                       'shape': t.shape()})
+    # Aufgabe
+    obj = {}
+    return json.dumps(obj)
 
 def zeichne_rand():
     # gehe in linke untere ecke
@@ -398,10 +394,10 @@ def zeichne_rand():
 # Automatisches Aktualisieren der Turtle-Elemente ausschalten
 turtle.tracer(False)
 
-spielername = 'Nobody' # input('Name eingeben:')
+spielername = 'Nobody'
 spielerfarbe = 'orange'
 spielfeld = Spielfeld(920, 920)
-spiel = Spiel(spielername, spielerfarbe, spielfeld, 12)
+spiel = Spiel(spielername, spielerfarbe, spielfeld, fps=2)
 gb = GameBroadcaster()
 
 # Auf dem Spielfeld sichtbare Elemente definieren
@@ -431,8 +427,21 @@ turtle.hideturtle()
 
 # Try-Except-Block fängt Beenden des Spiels ab
 try:
-    spiel.wiederhole_spiellogik()
-except turtle.Terminator:
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+    spiel.spiellogik()
+except:
     print("Das Spiel wurde beendet.")
     # exit(0) beendet das Program sauber
     exit(0)

@@ -13,7 +13,9 @@ class GameBroadcaster:
         self.broadcast_address = ("255.255.255.255", port)
 
     def broadcast_game(self, serialized_game: str):
-        self.sender.sendto(serialized_game.encode(), self.broadcast_address)
+        # self.sender.sendto(serialized_game.encode(), self.broadcast_address)
+        # Aufgabe
+        pass
 
     def receive_game_broadcasts(self) -> (str, str):
         try:
